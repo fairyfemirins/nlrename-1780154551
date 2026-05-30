@@ -1,41 +1,58 @@
+#!/usr/bin/env python3
+"""
+Test cases for nlrename.py
+"""
+
 import os
-import pytest
+import tempfile
+import unittest
 from datetime import datetime
 from unittest.mock import patch
-from nlrename import parse_pattern, cli, apply_rename_ops
+
+from nlrename import parse_expression, rename_file
 
 
-def test_parse_pattern_date():
-    with patch('nlrename.datetime') as mock_datetime:
-        mock_datetime.now.return_value = datetime(2026, 5, 30)
-        assert parse_pattern("today's date") == [('prepend', '2026-05-30')]
+class TestNLrename(unittest.TestCase):
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.test_file = os.path.join(self.temp_dir.name, "test.txt")
+        with open(self.test_file, "w") as f:
+            f.write("test")
+
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
+    def test_parse_expression_date(self):
+        func = parse_expression("today's date + original name")
+        self.assertEqual(func("test.txt"), f"{datetime.now().strftime('%Y-%m-%d')}_test.txt")
+
+    def test_parse_expression_regex(self):
+        func = parse_expression("s/txt/log/")
+        self.assertEqual(func("test.txt"), "test.log")
+
+    def test_parse_expression_lowercase(self):
+        func = parse_expression("lowercase all")
+        self.assertEqual(func("TEST.TXT"), "test.txt")
+
+    def test_parse_expression_uppercase(self):
+        func = parse_expression("uppercase all")
+        self.assertEqual(func("test.txt"), "TEST.TXT")
+
+    def test_rename_file_dry_run(self):
+        new_path = rename_file(self.test_file, "new.txt", dry_run=True)
+        self.assertIsNotNone(new_path)
+        if new_path:
+            self.assertTrue(new_path.endswith("new.txt"))
+        self.assertTrue(os.path.exists(self.test_file))
+        self.assertFalse(os.path.exists(new_path) if new_path else True)
+
+    def test_rename_file_actual(self):
+        new_path = rename_file(self.test_file, "new.txt")
+        self.assertIsNotNone(new_path)
+        if new_path:
+            self.assertTrue(os.path.exists(new_path))
+            self.assertFalse(os.path.exists(self.test_file))
 
 
-def test_parse_pattern_case():
-    assert parse_pattern("all to lowercase") == [('case', 'lower')]
-    assert parse_pattern("all to uppercase") == [('case', 'upper')]
-
-
-def test_parse_pattern_replace():
-    assert parse_pattern("replace 'old' with 'new'") == [('replace', ("'old'", "'new'"))]
-
-
-def test_apply_rename_ops():
-    assert apply_rename_ops("file.txt", [('case', 'lower')]) == "file.txt"
-    assert apply_rename_ops("FILE.TXT", [('case', 'lower')]) == "file.txt"
-    assert apply_rename_ops("file.txt", [('prepend', '2026-05-30')]) == "2026-05-30_file.txt"
-    assert apply_rename_ops("old_file.txt", [('replace', ('old', 'new'))]) == "new_file.txt"
-
-
-def test_integration(tmp_path):
-    test_file = tmp_path / "OLD_FILE.TXT"
-    test_file.write_text("test")
-    
-    # Simulate CLI call
-    os.chdir(tmp_path)
-    from click.testing import CliRunner
-    
-    runner = CliRunner()
-    result = runner.invoke(cli, ["all to lowercase", "OLD_FILE.TXT"])
-    assert result.exit_code == 0
-    assert (tmp_path / "old_file.txt").exists()
+if __name__ == "__main__":
+    unittest.main()

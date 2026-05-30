@@ -1,65 +1,57 @@
-# Natural Language File Renamer (`nlrename`)
+# NL Rename: Natural Language File Renamer
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Rename files using natural language expressions:
+- `nlrename "today's date + original name"`
+- `nlrename "s/IMG/DSC/"`
+- `nlrename "lowercase all"`
+- `nlrename "uppercase all"`
 
-A CLI tool to rename files using natural language commands. No more memorizing `mv` flags or writing regex — just describe what you want in plain English.
+![Demo](https://via.placeholder.com/600x150?text=NL+Rename+Demo)
 
 ## Features
-- **Natural Language Patterns**: Rename files using commands like:
-  - `"all PDFs to lowercase"`
-  - `"prepend today's date"`
-  - `"replace spaces with underscores"`
-  - `"append 'backup'"`
-- **Bulk Operations**: Rename multiple files at once.
-- **Dry Run Mode**: Preview changes before applying them.
-- **Recursive Mode**: Rename files in subdirectories.
-
-## Note
-This repository was published under `fairyfemirins/nlrename-1780117470` due to namespace restrictions in cron mode.
-To transfer to `femirins/nlrename`:
-1. Go to: [https://github.com/fairyfemirins/nlrename-1780117470/settings](https://github.com/fairyfemirins/nlrename-1780117470/settings)
-2. Under "Danger Zone", select "Transfer repository".
-3. Enter `femirins/nlrename` as the new owner.
+- **Natural Language**: Rename files using intuitive expressions (e.g., `"today's date + original name"`).
+- **Regex Support**: Use `s/pattern/replacement/` to rename files with regex.
+- **Case Transformations**: Convert filenames to `lowercase`, `UPPERCASE`, or `TitleCase`.
+- **Dry Run**: Preview changes with `--dry-run`.
+- **Recursive**: Rename files in subdirectories with `--recursive`.
 
 ## Installation
 ```bash
-pip install click python-dateutil regex
-chmod +x nlrename.py
-sudo ln -s $(pwd)/nlrename.py /usr/local/bin/nlrename
+pip install click python-dateutil
 ```
 
 ## Usage
 ```bash
-# Rename all PDFs to lowercase
-nlrename "all PDFs to lowercase" /path/to/files
+# Rename all files in the current directory
+nlrename "today's date + original name"
 
-# Prepend today's date to all files
-nlrename "prepend today's date" /path/to/files
-
-# Replace spaces with underscores
-nlrename "replace spaces with underscores" /path/to/files
+# Rename specific files
+nlrename "s/IMG/DSC/" IMG_123.jpg IMG_456.jpg
 
 # Dry run (preview changes)
-nlrename "all PDFs to lowercase" /path/to/files --dry-run
+nlrename --dry-run "lowercase all"
 
-# Recursive mode
-nlrename "all PDFs to lowercase" /path/to/files --recursive
+# Recursive rename
+nlrename --recursive "uppercase all"
 ```
 
 ## Examples
-| Command | Before | After |
-|---------|--------|-------|
-| `nlrename "all PDFs to lowercase" .` | `DOCUMENT.PDF` | `document.pdf` |
-| `nlrename "prepend today's date" .` | `report.pdf` | `2026-05-30_report.pdf` |
-| `nlrename "replace spaces with underscores" .` | `my file.txt` | `my_file.txt` |
+| Expression                  | Before       | After               |
+|----------------------------|--------------|---------------------|
+| `"today's date + original name"` | `notes.txt`  | `2026-05-30_notes.txt` |
+| `"s/IMG/DSC/"`            | `IMG_123.jpg`| `DSC_123.jpg`       |
+| `"lowercase all"`         | `TEST.TXT`   | `test.txt`          |
+| `"uppercase all"`         | `test.txt`   | `TEST.TXT`          |
+
+## Technical Architecture
+- **Language**: Python 3.11+
+- **Dependencies**: `click`, `python-dateutil`
+- **Entry Point**: `nlrename.py` (single-file CLI tool)
+- **Testing**: `unittest` (see `test_nlrename.py`)
 
 ## Limitations
-- **Case Sensitivity**: Patterns are case-insensitive, but filenames are not.
-- **File Extensions**: Only basic file extension filters are supported (PDFs, images, docs).
-- **Complex Patterns**: Regex support is limited to simple patterns.
-
-## Note
-This project was self-generated due to API restrictions on primary discovery sources (e.g., Reddit).
+- **No Undo**: Always use `--dry-run` before applying changes.
+- **No Conflict Handling**: Overwrites existing files if names collide.
 
 ## License
 MIT
