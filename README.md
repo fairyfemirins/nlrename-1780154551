@@ -2,61 +2,57 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A CLI tool to rename files using natural language (e.g., `nlrename "all PDFs to lowercase"`, `nlrename "prepend today's date"`).
+A CLI tool to rename files using natural language commands. No more memorizing `mv` flags or writing regex — just describe what you want in plain English.
 
 ## Features
-- **Case Transformation**: `lowercase`, `uppercase`, `titlecase`.
-- **Date Patterns**: Prepend `today's date` or `yesterday's date`.
-- **Regex Replace**: Replace text in filenames (e.g., `replace foo with bar`).
-- **Extension Filters**: Target specific file types (e.g., `all PDFs`).
-- **Dry Run**: Preview changes with `--dry-run`.
-- **Recursive**: Rename files in subdirectories with `--recursive`.
+- **Natural Language Patterns**: Rename files using commands like:
+  - `"all PDFs to lowercase"`
+  - `"prepend today's date"`
+  - `"replace spaces with underscores"`
+  - `"append 'backup'"`
+- **Bulk Operations**: Rename multiple files at once.
+- **Dry Run Mode**: Preview changes before applying them.
+- **Recursive Mode**: Rename files in subdirectories.
 
 ## Installation
 ```bash
 pip install click python-dateutil regex
+chmod +x nlrename.py
+sudo ln -s $(pwd)/nlrename.py /usr/local/bin/nlrename
 ```
 
 ## Usage
 ```bash
 # Rename all PDFs to lowercase
-nlrename "all PDFs to lowercase"
+nlrename "all PDFs to lowercase" /path/to/files
 
 # Prepend today's date to all files
-nlrename "prepend today's date"
+nlrename "prepend today's date" /path/to/files
 
-# Replace "foo" with "bar" in all filenames
-nlrename "replace foo with bar"
+# Replace spaces with underscores
+nlrename "replace spaces with underscores" /path/to/files
 
-# Preview changes without renaming
-nlrename "all PDFs to lowercase" --dry-run
+# Dry run (preview changes)
+nlrename "all PDFs to lowercase" /path/to/files --dry-run
 
-# Rename files in subdirectories
-nlrename "all PDFs to lowercase" --recursive
+# Recursive mode
+nlrename "all PDFs to lowercase" /path/to/files --recursive
 ```
 
 ## Examples
-| Pattern                          | Before          | After               |
-|---------------------------------|-----------------|---------------------|
-| `all PDFs to lowercase`         | `Document.PDF`  | `document.pdf`      |
-| `prepend today's date`          | `notes.txt`     | `2026-05-30_notes.txt` |
-| `replace foo with bar`          | `foo.txt`       | `bar.txt`           |
-
-## Technical Architecture
-- **Language**: Python 3.8+
-- **Dependencies**: `click`, `python-dateutil`, `regex`
-- **Pattern Parser**: Regex-based natural language parser
-- **File System**: Uses `os.rename` for atomic operations
+| Command | Before | After |
+|---------|--------|-------|
+| `nlrename "all PDFs to lowercase" .` | `DOCUMENT.PDF` | `document.pdf` |
+| `nlrename "prepend today's date" .` | `report.pdf` | `2026-05-30_report.pdf` |
+| `nlrename "replace spaces with underscores" .` | `my file.txt` | `my_file.txt` |
 
 ## Limitations
-- **Case Sensitivity**: Filters are case-insensitive (e.g., `.PDF` matches `.pdf`).
-- **No Undo**: Use `--dry-run` before live renames.
-- **No Wildcards**: Use regex or filters instead.
+- **Case Sensitivity**: Patterns are case-insensitive, but filenames are not.
+- **File Extensions**: Only basic file extension filters are supported (PDFs, images, docs).
+- **Complex Patterns**: Regex support is limited to simple patterns.
 
 ## Note
 This project was self-generated due to API restrictions on primary discovery sources (e.g., Reddit).
 
-This repository is published under `fairyfemirins/nlrename` due to GitHub namespace restrictions. To transfer to `femirins/nlrename`:
-1. Go to: [https://github.com/fairyfemirins/nlrename/settings](https://github.com/fairyfemirins/nlrename/settings)
-2. Under "Danger Zone", select "Transfer repository".
-3. Enter `femirins/nlrename` as the new owner.
+## License
+MIT

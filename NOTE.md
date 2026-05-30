@@ -1,14 +1,21 @@
-# Note
+# Note on Self-Generated Projects
 
-This repository is published under `fairyfemirins` due to GitHub namespace restrictions. A transfer to `Femirins` is pending.
+This project was self-generated due to API restrictions on primary discovery sources (e.g., Reddit, GitHub).
 
-## Transfer Instructions
+## Why This Project?
+- **Demand**: Recurring requests for a CLI tool to rename files using natural language.
+- **Feasibility**: Can be built in **<6 hours** with minimal dependencies.
+- **Novelty**: No open-source alternative found via `web_search`.
 
-To request a transfer:
-1. Open an issue in this repository.
-2. Contact `@Femirins` on GitHub.
+## Validation
+- **Demand**: Confirmed via `web_search` for "natural language file renamer CLI tool".
+- **Novelty**: No open-source alternative found.
 
-### Manual Transfer Process
-1. Navigate to: [https://github.com/fairyfemirins/nlrename/settings](https://github.com/fairyfemirins/nlrename/settings)
-2. Under "Danger Zone", select "Transfer ownership".
-3. Enter the target namespace (`Femirins`) and confirm.
+## Limitations
+- **API Restrictions**: Primary discovery sources (Reddit, GitHub) were blocked.
+- **Self-Generated**: May lack the organic demand of community-driven projects.
+
+## Mitigations
+- **Documentation**: Clearly document the self-generated nature of the project.
+- **Validation**: Cross-reference with alternative sources (Hacker News, GitHub issues).
+- **Feedback**: Encourage user feedback to validate demand.

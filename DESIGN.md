@@ -1,51 +1,57 @@
-# DESIGN.md: Natural Language File Renamer
+# Design Document: Natural Language File Renamer (`nlrename`)
 
 ## Overview
-`nlrename` is a CLI tool for renaming files using natural language. It parses user input into structured operations (case, date, replace, filter) and applies them to filenames.
+`nlrename` is a CLI tool that translates natural language commands into file renaming operations. It is designed for users who want to rename files without memorizing `mv` flags or writing regex.
 
 ## Goals
-- **Accessibility**: Enable non-technical users to rename files without learning `mv` or `rename`.
-- **Automation**: Support bulk operations (e.g., `all PDFs to lowercase`).
-- **Safety**: Provide `--dry-run` to preview changes.
+- **Simplicity**: Use plain English to describe renaming operations.
+- **Flexibility**: Support common use cases (case transformations, date patterns, string replacements).
+- **Safety**: Provide a dry-run mode to preview changes.
 
 ## Architecture
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  User Input │ -> │  Parser     │ -> │  Renamer    │
+│   User     │ →  │  CLI       │ →  │  Renamer   │
 └─────────────┘    └─────────────┘    └─────────────┘
        │                  │                  │
        ▼                  ▼                  ▼
 ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│  Examples   │    │  Regex      │    │  os.rename  │
+│  Pattern    │    │  File      │    │  OS        │
+│  Parser     │    │  System    │    │  Rename    │
 └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ### Components
-1. **Parser** (`parse_pattern`):
-   - Input: Natural language string (e.g., `"all PDFs to lowercase"`).
-   - Output: List of operations (e.g., `[('case', 'lower'), ('filter', '.pdf')]`).
-   - Uses regex to extract patterns (e.g., `replace (.*?) with (.*?)`).
+1. **CLI**: Uses `click` for argument parsing and help text.
+2. **Pattern Parser**: Translates natural language into file operations.
+3. **File System**: Uses `os` and `os.path` for file operations.
+4. **OS Rename**: Uses `os.rename` to apply changes.
 
-2. **Renamer** (`apply_rename_ops`):
-   - Input: Filename and operations.
-   - Output: New filename.
-   - Applies operations in sequence (case → prepend → replace → filter).
+## Pattern Matching Logic
+The tool uses keyword matching to identify the user's intent:
 
-3. **CLI** (`cli`):
-   - Uses `click` for argument parsing and help text.
-   - Supports `--dry-run` and `--recursive`.
+| Keyword | Action |
+|---------|--------|
+| `lowercase` | Convert filename to lowercase |
+| `uppercase` | Convert filename to uppercase |
+| `title case` | Convert filename to title case |
+| `today's date` | Prepend/append today's date |
+| `replace X with Y` | Replace `X` with `Y` in the filename |
+| `regex "X" with "Y"` | Replace regex `X` with `Y` |
+| `append X` | Append `X` to the filename |
+| `prepend X` | Prepend `X` to the filename |
 
-## Trade-offs
-- **Simplicity vs. Power**: Prioritizes simple patterns over complex logic (e.g., no arithmetic).
-- **Safety vs. Speed**: `--dry-run` adds an extra step but prevents mistakes.
-- **Extensibility**: New patterns can be added to `parse_pattern` without breaking changes.
+## Error Handling
+- **File Not Found**: Skip files that do not exist.
+- **Permission Denied**: Skip files that cannot be renamed.
+- **Invalid Patterns**: Ignore unsupported patterns.
+
+## Testing
+- **Unit Tests**: Test individual pattern matching logic.
+- **Integration Tests**: Test end-to-end renaming operations.
+- **Edge Cases**: Test with special characters, long filenames, and nested directories.
 
 ## Future Work
-- **Undo Support**: Track renames in a log file.
-- **Interactive Mode**: Prompt for confirmation before renaming.
-- **Plugins**: Support custom operations (e.g., `nlrename "hash filenames"`).
-
-## Lessons Learned
-- **Case Sensitivity**: Filters must be case-insensitive (e.g., `.PDF` vs `.pdf`).
-- **Edge Cases**: Handle files without extensions (e.g., `LICENSE`).
-- **Debugging**: Dry-run mode is essential for user trust.
+- **Custom Patterns**: Allow users to define their own patterns.
+- **Undo Functionality**: Support undoing the last renaming operation.
+- **GUI**: Build a graphical interface for non-CLI users.

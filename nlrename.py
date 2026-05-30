@@ -1,7 +1,12 @@
 #!/usr/bin/env python3
 """
 Natural Language File Renamer (nlrename)
-Rename files using natural language (e.g., "all PDFs to lowercase", "prepend today's date").
+
+Rename files using natural language commands:
+- "all PDFs to lowercase"
+- "prepend today's date"
+- "replace spaces with underscores"
+- "append 'backup'"
 """
 
 import os
@@ -13,117 +18,115 @@ from dateutil.relativedelta import relativedelta
 
 @click.command()
 @click.argument('pattern', type=str)
-@click.argument('files', nargs=-1, type=click.Path(exists=True))
-@click.option('--dry-run', is_flag=True, help='Preview changes without renaming.')
-@click.option('--recursive', is_flag=True, help='Rename files in subdirectories.')
-def cli(pattern: str, files, dry_run: bool, recursive: bool):
+@click.argument('path', type=click.Path(exists=True), default='.')
+@click.option('--dry-run', is_flag=True, help='Show what would be renamed without making changes.')
+@click.option('--recursive', is_flag=True, help='Rename files recursively in subdirectories.')
+def cli(pattern: str, path: str, dry_run: bool, recursive: bool):
     """Rename files using natural language patterns."""
-    # Parse pattern
-    rename_ops = parse_pattern(pattern)
-    if not rename_ops:
-        click.echo("Error: Could not parse pattern. Examples:")
-        click.echo("  nlrename 'all to lowercase' file1.txt file2.pdf")
-        click.echo("  nlrename 'prepend today's date' *.jpg")
-        click.echo("  nlrename 'replace foo with bar' *.txt")
-        return
+    renamer = NaturalLanguageRenamer(pattern, path, dry_run, recursive)
+    renamer.run()
 
-    # Collect files
-    if not files:
-        files = []
-        if recursive:
-            for root, _, filenames in os.walk('.'):
-                for filename in filenames:
-                    files.append(os.path.join(root, filename))
+
+class NaturalLanguageRenamer:
+    def __init__(self, pattern: str, path: str, dry_run: bool, recursive: bool):
+        self.pattern = pattern.lower()
+        self.path = path
+        self.dry_run = dry_run
+        self.recursive = recursive
+        self.file_count = 0
+        self.renamed_count = 0
+
+    def run(self):
+        """Run the renamer."""
+        if self.recursive:
+            for root, _, files in os.walk(self.path):
+                for file in files:
+                    self._process_file(root, file)
         else:
-            files = [f for f in os.listdir('.') if os.path.isfile(f)]
+            for file in os.listdir(self.path):
+                if os.path.isfile(os.path.join(self.path, file)):
+                    self._process_file(self.path, file)
 
-    # Debug: Print collected files
-    click.echo(f"[DEBUG] Collected files: {files}")
+        click.echo(f"Processed {self.file_count} files, renamed {self.renamed_count}.")
 
-    # Apply renames
-    for filepath in files:
-        dirname, basename = os.path.split(filepath)
-        new_name = apply_rename_ops(basename, rename_ops)
-        if new_name != basename:
-            new_path = os.path.join(dirname, new_name)
-            if dry_run:
-                click.echo(f"[DRY RUN] {filepath} -> {new_path}")
+    def _process_file(self, root: str, file: str):
+        """Process a single file."""
+        self.file_count += 1
+        old_path = os.path.join(root, file)
+        new_name = self._apply_pattern(file)
+        if new_name != file:
+            new_path = os.path.join(root, new_name)
+            if self.dry_run:
+                click.echo(f"[DRY RUN] {old_path} -> {new_path}")
             else:
-                os.rename(filepath, new_path)
-                click.echo(f"Renamed: {filepath} -> {new_path}")
+                os.rename(old_path, new_path)
+                click.echo(f"Renamed: {old_path} -> {new_path}")
+            self.renamed_count += 1
 
+    def _apply_pattern(self, filename: str) -> str:
+        """Apply the natural language pattern to a filename."""
+        name, ext = os.path.splitext(filename)
 
-def parse_pattern(pattern: str) -> list:
-    """Parse natural language pattern into rename operations."""
-    pattern = pattern.lower().strip()
-    ops = []
-    click.echo(f"[DEBUG] Parsing pattern: {pattern}")
+        # File extension filters (case-insensitive)
+        ext_lower = ext.lower()
+        if 'pdfs' in self.pattern and ext_lower != '.pdf':
+            return filename
+        elif 'images' in self.pattern and ext_lower not in ('.jpg', '.jpeg', '.png', '.gif'):
+            return filename
+        elif 'docs' in self.pattern and ext_lower not in ('.doc', '.docx', '.txt'):
+            return filename
 
-    # Case transformations
-    if 'lowercase' in pattern:
-        ops.append(('case', 'lower'))
-    elif 'uppercase' in pattern:
-        ops.append(('case', 'upper'))
-    elif 'titlecase' in pattern:
-        ops.append(('case', 'title'))
+        # Case transformations
+        if 'lowercase' in self.pattern or 'to lowercase' in self.pattern or 'all pdfs to lowercase' in self.pattern:
+            name = name.lower()
+            ext = ext.lower()
+        elif 'uppercase' in self.pattern or 'to uppercase' in self.pattern:
+            name = name.upper()
+            ext = ext.upper()
+        elif 'title case' in self.pattern:
+            name = name.title()
 
-    # Date patterns
-    if "today's date" in pattern:
-        ops.append(('prepend', datetime.now().strftime('%Y-%m-%d')))
-    elif "yesterday's date" in pattern:
-        ops.append(('prepend', (datetime.now() - relativedelta(days=1)).strftime('%Y-%m-%d')))
+        return f"{name}{ext}"
+        if "today's date" in self.pattern:
+            today = datetime.now().strftime('%Y-%m-%d')
+            if 'prepend' in self.pattern:
+                name = f"{today}_{name}"
+            elif 'append' in self.pattern:
+                name = f"{name}_{today}"
+        elif 'yesterday' in self.pattern:
+            yesterday = (datetime.now() - relativedelta(days=1)).strftime('%Y-%m-%d')
+            if 'prepend' in self.pattern:
+                name = f"{yesterday}_{name}"
+            elif 'append' in self.pattern:
+                name = f"{name}_{yesterday}"
 
-    # Regex replace
-    if 'replace' in pattern:
-        match = re.search(r'replace (.*?) with (.*?)(?:$|\s)', pattern)
-        if match:
-            ops.append(('replace', (match.group(1), match.group(2))))
+        # String replacements
+        if 'replace spaces with underscores' in self.pattern:
+            name = name.replace(' ', '_')
+        elif 'replace underscores with spaces' in self.pattern:
+            name = name.replace('_', ' ')
+        elif 'replace' in self.pattern and 'with' in self.pattern:
+            parts = self.pattern.split('replace')[1].split('with')
+            old = parts[0].strip()
+            new = parts[1].strip().split()[0]  # Take the first word after 'with'
+            name = name.replace(old, new)
 
-    # File extension filters
-    if 'pdfs' in pattern:
-        ops.append(('filter', '.pdf'))
-    elif 'images' in pattern:
-        ops.append(('filter', ('.jpg', '.jpeg', '.png', '.gif')))
+        # Regex patterns
+        if 'regex' in self.pattern:
+            match = re.search(r'regex "(.+?)" with "(.+?)"', self.pattern)
+            if match:
+                old_regex, new_regex = match.groups()
+                name = re.sub(old_regex, new_regex, name)
 
-    return ops
+        # Append/prepend text
+        if 'append' in self.pattern:
+            text = self.pattern.split('append')[1].strip().strip("'")
+            name = f"{name}{text}"
+        elif 'prepend' in self.pattern:
+            text = self.pattern.split('prepend')[1].strip().strip("'")
+            name = f"{text}{name}"
 
-
-def apply_rename_ops(filename: str, ops: list) -> str:
-    """Apply rename operations to a filename."""
-    name, ext = os.path.splitext(filename)
-    new_name = name
-    new_ext = ext
-    click.echo(f"[DEBUG] Processing file: {filename}, ops: {ops}")
-
-    for op in ops:
-        if op[0] == 'case':
-            if op[1] == 'lower':
-                new_name = new_name.lower()
-                new_ext = new_ext.lower()  # Apply case transform to extension too
-            elif op[1] == 'upper':
-                new_name = new_name.upper()
-                new_ext = new_ext.upper()
-            elif op[1] == 'title':
-                new_name = new_name.title()
-                new_ext = new_ext.title()
-        elif op[0] == 'prepend':
-            new_name = f"{op[1]}_{new_name}"
-        elif op[0] == 'replace':
-            new_name = re.sub(re.escape(op[1][0]), op[1][1], new_name)
-        elif op[0] == 'filter':
-            if isinstance(op[1], str) and new_ext.lower() != op[1].lower():
-                click.echo(f"[DEBUG] Skipping {filename}: extension {new_ext} does not match {op[1]}")
-                return filename  # Skip if extension doesn't match
-            elif isinstance(op[1], tuple) and new_ext.lower() not in [e.lower() for e in op[1]]:
-                click.echo(f"[DEBUG] Skipping {filename}: extension {new_ext} not in {op[1]}")
-                return filename  # Skip if extension not in tuple
-
-    return f"{new_name}{new_ext}"
-
-
-def apply_transformations(filename, transformations):
-    """Alias for apply_rename_ops (for backward compatibility)."""
-    return apply_rename_ops(filename, transformations)
+        return f"{name}{ext}"
 
 
 if __name__ == '__main__':
