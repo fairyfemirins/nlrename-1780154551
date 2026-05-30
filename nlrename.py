@@ -2,157 +2,176 @@
 """
 Natural Language File Renamer (nlrename)
 
-CLI tool to rename files using natural language instructions.
-Examples:
-  nlrename "add today's date to all PDFs" /path/to/files
-  nlrename "replace 'draft' with 'final'" /path/to/files --dry-run
-  nlrename "all files to lowercase" /path/to/files
+Rename files using natural language instructions:
+- "add today's date to all PDFs"
+- "replace 'draft' with 'final'"
+- "all files to lowercase"
+- "append '_backup' to all files"
+
+Usage:
+  python nlrename.py "<instruction>" <directory> [--dry-run] [--force]
 """
 
 import os
 import re
+import fnmatch
 import click
 from datetime import datetime
-from typing import List, Optional
 
 
-class NaturalLanguageRenamer:
-    """Core logic for parsing natural language instructions and renaming files."""
+def parse_instruction(instruction):
+    """Parse natural language instruction into a renaming rule."""
+    instruction = instruction.lower().strip()
+    rule = {
+        "action": None,
+        "pattern": None,
+        "replacement": None,
+        "file_filter": None,
+        "date_format": None,
+        "case_action": None,
+    }
 
-    def __init__(self, instruction: str, dry_run: bool = False):
-        self.instruction = instruction.lower()
-        self.dry_run = dry_run
-        self.date_pattern = r"today's date|current date|date"
-        self.case_pattern = r"to (lowercase|uppercase|title case)"
-        self.replace_pattern = r"replace ['\"](.*?)['\"] with ['\"](.*?)['\"]"
-        self.prefix_suffix_pattern = r"(add|prepend|append) ['\"](.*?)['\"]"
+    # Date-based instructions
+    if "today's date" in instruction:
+        rule["date_format"] = "%Y-%m-%d"
+        if "add" in instruction:
+            rule["action"] = "prepend_date"
+        elif "append" in instruction:
+            rule["action"] = "append_date"
 
-    def parse_instruction(self) -> dict:
-        """Parse the natural language instruction into a structured format."""
-        result = {
-            "action": "none",
-            "target": "all",
-            "pattern": None,
-            "replacement": None,
-            "case": None,
-            "prefix": None,
-            "suffix": None,
-        }
+    # Replace instructions
+    if "replace" in instruction:
+        rule["action"] = "replace"
+        match = re.search(r'replace ["]?([^"\s]+)["]? with ["]?([^"\s]+)["]?', instruction)
+        if match:
+            rule["pattern"] = match.group(1).strip("'")
+            rule["replacement"] = match.group(2).strip("'")
+        return rule  # Early return for replace
 
-        # Date-based renaming
-        if re.search(self.date_pattern, self.instruction):
-            result["action"] = "date"
-            result["target"] = "all"
+    # Case instructions
+    if "lowercase" in instruction:
+        rule["action"] = "lowercase"
+        return rule  # Early return for case instructions
+    elif "uppercase" in instruction:
+        rule["action"] = "uppercase"
+        return rule
 
-        # Case transformation
-        case_match = re.search(self.case_pattern, self.instruction)
-        if case_match:
-            result["action"] = "case"
-            result["case"] = case_match.group(1)
-            result["target"] = "all"
+    # Append/prepend instructions
+    if "append" in instruction and "date" not in instruction:
+        rule["action"] = "append"
+        match = re.search(r'append ["]?([^"\s]+)["]?', instruction)
+        if match:
+            rule["replacement"] = match.group(1)
+    elif "prepend" in instruction and "date" not in instruction:
+        rule["action"] = "prepend"
+        match = re.search(r'prepend ["]?([^"\s]+)["]?', instruction)
+        if match:
+            rule["replacement"] = match.group(1)
 
-        # Replace text
-        replace_match = re.search(self.replace_pattern, self.instruction)
-        if replace_match:
-            result["action"] = "replace"
-            result["pattern"] = replace_match.group(1)
-            result["replacement"] = replace_match.group(2)
-            result["target"] = "all"
+    # File filters (e.g., "all PDFs", "files named 'draft'")
+    if "all" in instruction:
+        match = re.search(r'all (\w+)s?', instruction)
+        if match:
+            rule["file_filter"] = f"*.{match.group(1)}"
+    elif "named" in instruction:
+        match = re.search(r'named ["]?([^"\s]+)["]?', instruction)
+        if match:
+            rule["file_filter"] = f"*{match.group(1)}*"
+    elif "replace" in instruction:
+        rule["file_filter"] = "*"  # Force filter for replace
 
-        # Prefix/Suffix
-        prefix_suffix_match = re.search(self.prefix_suffix_pattern, self.instruction)
-        if prefix_suffix_match:
-            action, text = prefix_suffix_match.groups()
-            if action in ["add", "prepend"]:
-                result["action"] = "prefix"
-                result["prefix"] = text
-            elif action == "append":
-                result["action"] = "suffix"
-                result["suffix"] = text
-            result["target"] = "all"
+    return rule
 
-        return result
 
-    def generate_new_name(self, filename: str, parsed: dict) -> Optional[str]:
-        """Generate the new filename based on the parsed instruction."""
-        name, ext = os.path.splitext(filename)
-        new_name = name
-        new_ext = ext
+def apply_rule(filename, rule):
+    """Apply renaming rule to a filename."""
+    name, ext = os.path.splitext(filename)
+    new_name = name
+    new_ext = ext.lower() if ext else ext
 
-        if parsed["action"] == "date":
-            today = datetime.now().strftime("%Y-%m-%d")
-            new_name = f"{today}_{new_name}"
+    click.echo(f"DEBUG: Processing {filename} (name: {name}, ext: {ext})")
+    click.echo(f"DEBUG: Rule - {rule}")
 
-        elif parsed["action"] == "case":
-            if parsed["case"] == "lowercase":
-                new_name = new_name.lower()
-                new_ext = new_ext.lower()
-            elif parsed["case"] == "uppercase":
-                new_name = new_name.upper()
-                new_ext = new_ext.upper()
-            elif parsed["case"] == "title case":
-                new_name = new_name.title()
-                new_ext = new_ext.title()
+    if rule["action"] == "prepend_date":
+        today = datetime.now().strftime(rule["date_format"])
+        new_name = f"{today}_{name}"
+    elif rule["action"] == "append_date":
+        today = datetime.now().strftime(rule["date_format"])
+        new_name = f"{name}_{today}"
+    elif rule["action"] == "replace":
+        new_name = re.sub(re.escape(rule["pattern"]), rule["replacement"], name)
+    elif rule["action"] == "lowercase":
+        new_name = name.lower()
+        new_ext = ext.lower()
+    elif rule["action"] == "uppercase":
+        new_name = name.upper()
+    elif rule["action"] == "append":
+        new_name = f"{name}{rule['replacement']}"
+    elif rule["action"] == "prepend":
+        new_name = f"{rule['replacement']}{name}"
 
-        elif parsed["action"] == "replace":
-            new_name = new_name.replace(parsed["pattern"], parsed["replacement"])
+    return f"{new_name}{new_ext}"
 
-        elif parsed["action"] == "prefix":
-            new_name = f"{parsed['prefix']}{new_name}"
 
-        elif parsed["action"] == "suffix":
-            new_name = f"{new_name}{parsed['suffix']}"
+def rename_files(directory, rule, dry_run=False, force=False):
+    """Rename files in directory based on rule."""
+    renamed = []
+    skipped = []
 
-        return f"{new_name}{new_ext}"
+    for root, _, files in os.walk(directory):
+        for filename in files:
+            if rule["file_filter"]:
+                if not fnmatch.fnmatch(filename, rule["file_filter"]):
+                    continue
 
-    def rename_files(self, directory: str, file_filter: Optional[str] = None) -> List[str]:
-        """Rename files in the directory based on the instruction."""
-        parsed = self.parse_instruction()
-        renamed = []
+            old_path = os.path.join(root, filename)
+            new_filename = apply_rule(filename, rule)
+            new_path = os.path.join(root, new_filename)
 
-        for filename in os.listdir(directory):
-            filepath = os.path.join(directory, filename)
-            if os.path.isdir(filepath):
+            if old_path == new_path:
+                skipped.append((filename, "No change"))
                 continue
-            if file_filter and file_filter not in filename.lower():
+
+            if not force and os.path.exists(new_path):
+                skipped.append((filename, "Target exists"))
                 continue
 
-            new_name = self.generate_new_name(filename, parsed)
-            if not new_name or new_name == filename:
-                continue
+            if dry_run:
+                renamed.append((filename, new_filename))
+                click.echo(f"DEBUG: Would rename {filename} → {new_filename}")
+            else:
+                os.rename(old_path, new_path)
+                renamed.append((filename, new_filename))
 
-            new_filepath = os.path.join(directory, new_name)
-            if not self.dry_run:
-                os.rename(filepath, new_filepath)
-            renamed.append(f"{filename} -> {new_name}")
-
-        return renamed
+    return renamed, skipped
 
 
 @click.command()
 @click.argument("instruction", type=str)
 @click.argument("directory", type=click.Path(exists=True))
-@click.option("--filter", "-f", type=str, help="Filter files by extension or substring (e.g., '.pdf')")
-@click.option("--dry-run", is_flag=True, help="Preview changes without renaming")
-@click.option("--debug", is_flag=True, help="Enable debug output")
-def cli(instruction: str, directory: str, filter: Optional[str], dry_run: bool, debug: bool):
-    """CLI entry point for nlrename."""
-    if debug:
-        click.echo(f"DEBUG: Instruction: {instruction}")
-        click.echo(f"DEBUG: Directory: {directory}")
-        click.echo(f"DEBUG: Filter: {filter}")
-        click.echo(f"DEBUG: Dry run: {dry_run}")
-
-    renamer = NaturalLanguageRenamer(instruction, dry_run)
-    renamed = renamer.rename_files(directory, filter)
-
-    if not renamed:
-        click.echo("No files matched the instruction.")
+@click.option("--dry-run", is_flag=True, help="Preview changes without renaming.")
+@click.option("--force", is_flag=True, help="Overwrite existing files.")
+def main(instruction, directory, dry_run, force):
+    """Main CLI entrypoint."""
+    rule = parse_instruction(instruction)
+    if not rule["action"]:
+        click.echo(f"Error: Could not parse instruction '{instruction}'.")
         return
 
-    for rename in renamed:
-        click.echo(rename)
+    renamed, skipped = rename_files(directory, rule, dry_run, force)
+
+    click.echo(f"\nInstruction: {instruction}")
+    click.echo(f"Directory: {directory}")
+    click.echo(f"Dry Run: {'Yes' if dry_run else 'No'}")
+    click.echo(f"\nRenamed Files:")
+    for old, new in renamed:
+        click.echo(f"  {old} → {new}")
+
+    if skipped:
+        click.echo(f"\nSkipped Files:")
+        for filename, reason in skipped:
+            click.echo(f"  {filename} ({reason})")
 
 
 if __name__ == "__main__":
-    cli()
+    main()
