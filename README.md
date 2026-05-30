@@ -14,6 +14,13 @@ A CLI tool to rename files using natural language commands. No more memorizing `
 - **Dry Run Mode**: Preview changes before applying them.
 - **Recursive Mode**: Rename files in subdirectories.
 
+## Note
+This repository was published under `fairyfemirins/nlrename-1780117470` due to namespace restrictions in cron mode.
+To transfer to `femirins/nlrename`:
+1. Go to: [https://github.com/fairyfemirins/nlrename-1780117470/settings](https://github.com/fairyfemirins/nlrename-1780117470/settings)
+2. Under "Danger Zone", select "Transfer repository".
+3. Enter `femirins/nlrename` as the new owner.
+
 ## Installation
 ```bash
 pip install click python-dateutil regex
